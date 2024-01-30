@@ -10,10 +10,19 @@ int getFlag(uint8_t *buffer){
 }
 
 void sendPacket(uint8_t flag, uint8_t *buffer, int buffer_len, int socketNum){
-	uint8_t sendBuf[buffer_len + 1];
+	int length = 0
+    if (buffer_len == 0){
+        length = 1;
+    }
+    else{
+        length = buffer_len + 1;
+    }
+    uint8_t sendBuf[length];
 	uint8_t *flag = sendBuf;
 	*flag = flag;
-	memcpy(sendBuf + 1, buffer, buffer_len);
+    if(buffer_len != 0){
+	    memcpy(sendBuf + 1, buffer, buffer_len);
+    }
 	int sent = 0;
 	sent = sendPDU(socketNum, sendbuf, len);
 	if(sent < 0){

@@ -1,1 +1,1 @@
-void sendPacket(uint8_t flag, uint8_t *buffer, int buffer_len, int socketNum)
+void sendPacket(uint8_t flag, uint8_t *buffer, int buffer_len, int socketNum);

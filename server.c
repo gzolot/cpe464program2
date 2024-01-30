@@ -25,6 +25,8 @@
 #include "safeUtil.h"
 #include "pdu.h"
 #include "pollLib.h"
+#include "program2lib.h"
+#include "linked.h"
 
 
 #define MAXBUF 1024
@@ -98,7 +100,7 @@ void processClient(int clientSocket){
 	if (messageLen > 0)
 	{
 		if(dataBuffer[0] == 1){
-
+			initializeClient(clientSocket, dataBuffer);
 		}
 		printf("Message received, Socket: %d length: %d Data: %s\n",clientSocket, messageLen, dataBuffer);
 	}
@@ -110,9 +112,21 @@ void processClient(int clientSocket){
 	}
 }
 
-
-
-
+void initializeClient(int clientSocket, uint8_t dataBuffer){
+	uint8_t handle_len = dataBuffer[1];
+	char handle[handle_len+1];
+	memcpy(handle, dataBuffer + 2, handle_len);
+	handle[handle_len] = '\0';
+	if(getSocketNumber(handle) == -1){
+		addNode(handle, clientSocket);
+		printList();
+		sendPacket(2, NULL, 0, clientSocket);
+	}
+	else{
+		sendPacket(3, NULL, 0, clientSocket);
+	}
+	if(getSocketNumber())
+}
 
 void recvFromClient(int clientSocket)
 {

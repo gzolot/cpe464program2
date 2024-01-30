@@ -10,3 +10,11 @@ struct handle
     struct handle *next;
 }
 
+void addNode(int socketNumber, char *name, int nameLength);
+int getSocketNumber(char *name);
+void removeNode(char *name);
+void printList(void);
+int getLength(void);
+
+
+
