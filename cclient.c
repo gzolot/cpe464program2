@@ -32,8 +32,10 @@
 
 void sendToServer(int socketNum);
 int readFromStdin(uint8_t * buffer);
-void checkArgs(int argc, char * argv[]);
+uint8_t checkArgs(int argc, char * argv[]);
 void processMsgFromServer(int socketNum);
+void setupConnection(uint8_t handle_len, char *handle, int socketNum);
+void sendInitialPacket(uint8_t handle_len, char * handle, int socketNum);
 
 // this function is used to handle a termination signal and set a global variable
 // so that the program will terminate nicely
@@ -73,14 +75,14 @@ int main(int argc, char * argv[])
 }
 
 void setupConnection(uint8_t handle_len, char *handle, int socketNum){
-	sendInitialPacket(handle_len, handle, socketNum)
+	sendInitialPacket(handle_len, handle, socketNum);
 	//recieve buffer that is 3 bytes long
 	uint8_t recvBuf[1];
 	recvPDU(socketNum, recvBuf, 1);
-	if(recvbuf[0] == 2){
-		printf("Handle has been added to server\n")
+	if(recvBuf[0] == 2){
+		printf("Handle has been added to server\n");
 	}
-	else if (recvBuf == 3){
+	else if (recvBuf[0] == 3){
 		printf("Handle already exists\n");
 		exit(-1);
 	}
@@ -168,7 +170,7 @@ uint8_t checkArgs(int argc, char * argv[])
 		exit(-1);
 	}
 	// return the length of the handle
-	return strlen(argv[1]);
+	return strlen(argv[1])+1;
 }
 
 

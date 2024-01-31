@@ -1,9 +1,9 @@
 #include "linked.h"
 
-struct node *head = NULL;
+struct handle *head = NULL;
 
 void addNode(int socketNumber, char *name, int nameLength){
-    struct node *newNode = (struct node *)malloc(sizeof(struct node));
+    struct handle *newNode = (struct handle *)malloc(sizeof(struct handle));
     if (newNode == NULL){
         perror("malloc");
         exit(-1);
@@ -15,7 +15,7 @@ void addNode(int socketNumber, char *name, int nameLength){
         exit(-1);
     }
     strcpy(newNode->name, name);
-    struct node *current = head;
+    struct handle *current = head;
     while (current != NULL){
         if (current->next == NULL){
             current->next = newNode;
@@ -29,7 +29,7 @@ void addNode(int socketNumber, char *name, int nameLength){
 }
 
 int getSocketNumber(char *name){
-    struct node *current = head;
+    struct handle *current = head;
     while (current != NULL){
         if (strcmp(current->name, name) == 0){
             return current->socketNumber;
@@ -40,10 +40,10 @@ int getSocketNumber(char *name){
 }
 
 void removeNode(char *name){
-    struct node *current = head;
-    struct node *prev = NULL;
+    struct handle *current = head;
+    struct handle *prev = NULL;
     while (current != NULL){
-        if (strcmp(current->next, name) == 0){
+        if (strcmp(current->next->name, name) == 0){
             if (prev == NULL){
                 head = current->next;
             }
@@ -60,7 +60,7 @@ void removeNode(char *name){
 }
 
 void printList(){
-    struct node *current = head;
+    struct handle *current = head;
     while (current != NULL){
         printf("Socket Number: %d, Name: %s\n", current->socketNumber, current->name);
         current = current->next;
@@ -69,7 +69,7 @@ void printList(){
 
 int getLength(){
     int length = 0;
-    struct node *current = head;
+    struct handle *current = head;
     while (current != NULL){
         length++;
         current = current->next;

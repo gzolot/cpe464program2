@@ -6,9 +6,9 @@
 struct handle
 {
     char *name;
-    int socket_num;
+    int socketNumber;
     struct handle *next;
-}
+};
 
 void addNode(int socketNumber, char *name, int nameLength);
 int getSocketNumber(char *name);

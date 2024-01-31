@@ -38,6 +38,7 @@ int checkArgs(int argc, char *argv[]);
 void serverControl(int mainServerSocket);
 void addNewSocket(int mainServerSocket);
 void processClient(int clientSocket);
+void initializeClient(int clientSocket, uint8_t *dataBuffer);
 
 int main(int argc, char *argv[])
 {
@@ -112,20 +113,19 @@ void processClient(int clientSocket){
 	}
 }
 
-void initializeClient(int clientSocket, uint8_t dataBuffer){
+void initializeClient(int clientSocket, uint8_t *dataBuffer){
 	uint8_t handle_len = dataBuffer[1];
 	char handle[handle_len+1];
 	memcpy(handle, dataBuffer + 2, handle_len);
 	handle[handle_len] = '\0';
 	if(getSocketNumber(handle) == -1){
-		addNode(handle, clientSocket);
+		addNode(clientSocket, handle, handle_len+1);
 		printList();
 		sendPacket(2, NULL, 0, clientSocket);
 	}
 	else{
 		sendPacket(3, NULL, 0, clientSocket);
 	}
-	if(getSocketNumber())
 }
 
 void recvFromClient(int clientSocket)
