@@ -36,6 +36,7 @@ uint8_t checkArgs(int argc, char * argv[]);
 void processMsgFromServer(int socketNum);
 void setupConnection(uint8_t handle_len, char *handle, int socketNum);
 void sendInitialPacket(uint8_t handle_len, char * handle, int socketNum);
+void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len);
 
 // this function is used to handle a termination signal and set a global variable
 // so that the program will terminate nicely
@@ -115,11 +116,11 @@ void processMsgFromServer(int socketNum){
 void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 {
 	uint8_t sendBuf[MAXBUF];   //data buffer
-	int sendLen = 0;        //amount of data to send
-	int sent = 0;            //actual amount of data sent/* get the data and send it   */
+	// int sendLen = 0;        //amount of data to send
+	// int sent = 0;            //actual amount of data sent/* get the data and send it   */
 	
 	// char *inputStr = (char *)sendBuf;
-	sendLen = readFromStdin(sendBuf);
+	readFromStdin(sendBuf);
 
 
 	int wordCount = getWordCount((char *) sendBuf);
@@ -140,7 +141,7 @@ void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 		getWords((char *)sendBuf+startIndexSecondWrd, 1, startPtrs);
 		//printf("first word: %s\nsecond word: %s\n", startPtrs[0], startPtrs[1]);
 		printf("Message packet\n");
-		//send message packet
+		sendMessage(socketNum, startPtrs, handle, handle_len);
 
 	}
 	else if(!(strcmp(firstWord, "%B")) || !(strcmp(firstWord, "%b"))){
@@ -180,10 +181,25 @@ void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 	// printf("Amount of data sent is: %d\n", sent);
 }
 
-// void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len){
-// 	char sendBuf[MAXBUF];
-
-// }
+void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len){
+	uint8_t sendBuf[MAXBUF];
+	memcpy(sendBuf, &handle_len, 1);
+	memcpy(sendBuf + 1, handle, handle_len);
+	uint8_t one = 1;
+	memcpy(sendBuf + 1 + handle_len, &one, 1);
+	uint8_t destHandleLen = strlen(startPtrs[0]);
+	memcpy(sendBuf + 2 + handle_len, &destHandleLen, 1);
+	memcpy(sendBuf + 3 + handle_len, startPtrs[0], strlen(startPtrs[0]));
+	if (startPtrs[1] != NULL){
+		memcpy(sendBuf + 3 + handle_len + strlen(startPtrs[0]), startPtrs[1], strlen(startPtrs[1])+1);
+	}
+	else{
+		char *nullstring = "\n\0";
+		memcpy(sendBuf + 3 + handle_len + strlen(startPtrs[0]), nullstring, 2);
+	}
+	sendPacket(5, sendBuf, 4 + handle_len + strlen(startPtrs[0]) + strlen(startPtrs[1]), socketNum);
+	printf("The following message was sent to the server: %s\n", startPtrs[1]);
+}
 
 int readFromStdin(uint8_t * buffer)
 {
@@ -224,7 +240,7 @@ uint8_t checkArgs(int argc, char * argv[])
 		exit(-1);
 	}
 	// return the length of the handle
-	return strlen(argv[1])+1;
+	return strlen(argv[1]);
 }
 
 

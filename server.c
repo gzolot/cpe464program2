@@ -39,6 +39,7 @@ void serverControl(int mainServerSocket);
 void addNewSocket(int mainServerSocket);
 void processClient(int clientSocket);
 void initializeClient(int clientSocket, uint8_t *dataBuffer);
+void processMessage(int clientSocket, uint8_t *dataBuffer, int messageLen);
 
 int main(int argc, char *argv[])
 {
@@ -103,6 +104,9 @@ void processClient(int clientSocket){
 		if(dataBuffer[0] == 1){
 			initializeClient(clientSocket, dataBuffer);
 		}
+		if(dataBuffer[0] == 5){
+			processMessage(clientSocket, dataBuffer, messageLen);
+		}
 		printf("Message received, Socket: %d length: %d Data: %s\n",clientSocket, messageLen, dataBuffer);
 	}
 	else
@@ -111,6 +115,27 @@ void processClient(int clientSocket){
 		close(clientSocket);
 		removeFromPollSet(clientSocket);
 	}
+}
+
+void processMessage(int clientSocket, uint8_t *dataBuffer, int messageLen){
+	uint8_t sendingHandleLen = dataBuffer[1];
+	int bufferOffset = 1+1+sendingHandleLen;
+	uint8_t numberOfHandles = dataBuffer[bufferOffset];
+	bufferOffset++;
+	if(numberOfHandles ==1){
+		uint8_t destHandleLen = dataBuffer[bufferOffset];
+		bufferOffset++;
+		char desHandle[destHandleLen];
+		memcpy(desHandle, dataBuffer + bufferOffset, destHandleLen);
+		int destSocket = getSocketNumber(desHandle);
+		if(destSocket != -1){
+			sendPDU(destSocket, dataBuffer, messageLen);
+		}
+		else{
+			printf("destination handle %s not found\n", desHandle);
+		}
+	}
+
 }
 
 void initializeClient(int clientSocket, uint8_t *dataBuffer){
