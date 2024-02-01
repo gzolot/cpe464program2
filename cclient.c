@@ -54,11 +54,11 @@ int main(int argc, char * argv[])
 	addToPollSet(socketNum);
 	addToPollSet(STDIN_FILENO);
 	while(1){
-		printf("Enter data: ");
+		printf("$: ");
 		fflush(stdout);
 		int pollReturn = pollCall(-1);
 		if(pollReturn == STDIN_FILENO){
-			sendToServer(socketNum);
+			sendToServer(socketNum, argv[1], handle_len);
 		}
 		else if(pollReturn == socketNum){
 			processMsgFromServer(socketNum);
@@ -112,24 +112,66 @@ void processMsgFromServer(int socketNum){
 	printf("Received: %s\n", recvBuf);
 }
 
-void sendToServer(int socketNum)
+void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 {
 	uint8_t sendBuf[MAXBUF];   //data buffer
 	int sendLen = 0;        //amount of data to send
 	int sent = 0;            //actual amount of data sent/* get the data and send it   */
 	
+	// char *inputStr = (char *)sendBuf;
 	sendLen = readFromStdin(sendBuf);
-	printf("read: %s string len: %d (including null)\n", sendBuf, sendLen);
-	
-	sent =  sendPDU(socketNum, sendBuf, sendLen);
-	if (sent < 0)
-	{
-		perror("send call");
-		exit(-1);
+	//printf("read: %s string len: %d (including null)\n", sendBuf, sendLen);
+	int wordCount = getWordCount((char *) sendBuf);
+	char *startPtrs[wordCount];
+	wordCount = getWords((char *)sendBuf, startPtrs);
+	if (!(strcmp(startPtrs[0], "%M")) || !(strcmp(startPtrs[0], "%m"))){
+		//process message packet
+		printf("Message packet\n");
+		printf("wordCount: %d\n", wordCount);
+		if(wordCount < 3){
+			printf("Invalid message\n");
+			return;
+		}
+		//send message packet
+
+	}
+	else if(!(strcmp(startPtrs[0], "%B")) || !(strcmp(startPtrs[0], "%b"))){
+		//process broadcast packet
+		printf("Broadcast packet\n");
+	}
+	else if(!(strcmp(startPtrs[0], "%L")) || !(strcmp(startPtrs[0], "%l"))){
+		//process list packet
+		printf("List packet\n");
+	}
+	else if(!(strcmp(startPtrs[0], "%E")) || !(strcmp(startPtrs[0], "%e"))){
+		//process exit packet
+		printf("Exit packet\n");
+	}
+	else if(!(strcmp(startPtrs[0], "%C")) || !(strcmp(startPtrs[0], "%c"))){
+		//process multicast packet
+		printf("Multicast packet\n");
+	}
+	else{
+		printf("Invalid command\n");
+		return;
 	}
 
-	printf("Amount of data sent is: %d\n", sent);
+
+	// sent =  sendPDU(socketNum, sendBuf, sendLen);
+	// if (sent < 0)
+	// {
+	// 	perror("send call");
+	// 	exit(-1);
+	// }
+
+	// printf("Amount of data sent is: %d\n", sent);
 }
+
+void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len){
+
+}
+
+
 
 int readFromStdin(uint8_t * buffer)
 {
