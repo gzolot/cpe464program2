@@ -30,7 +30,7 @@
 #define MAXBUF 1024
 #define DEBUG_FLAG 1
 
-void sendToServer(int socketNum);
+void sendToServer(int socketNum, char * handle, uint8_t handle_len);
 int readFromStdin(uint8_t * buffer);
 uint8_t checkArgs(int argc, char * argv[]);
 void processMsgFromServer(int socketNum);
@@ -120,34 +120,47 @@ void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 	
 	// char *inputStr = (char *)sendBuf;
 	sendLen = readFromStdin(sendBuf);
-	//printf("read: %s string len: %d (including null)\n", sendBuf, sendLen);
+
+
 	int wordCount = getWordCount((char *) sendBuf);
-	char *startPtrs[wordCount];
-	wordCount = getWords((char *)sendBuf, startPtrs);
-	if (!(strcmp(startPtrs[0], "%M")) || !(strcmp(startPtrs[0], "%m"))){
+	if(wordCount == 0){
+		printf("Invalid command\n");
+		return;
+	}
+	int startIndexSecondWrd = getFirst((char *)sendBuf);
+	char *firstWord = (char *)sendBuf;
+
+	if (!(strcmp(firstWord, "%M")) || !(strcmp(firstWord, "%m"))){
 		//process message packet
-		printf("Message packet\n");
-		printf("wordCount: %d\n", wordCount);
-		if(wordCount < 3){
+		if(wordCount < 2){
 			printf("Invalid message\n");
 			return;
 		}
+		char *startPtrs[2];
+		getWords((char *)sendBuf+startIndexSecondWrd, 1, startPtrs);
+		//printf("first word: %s\nsecond word: %s\n", startPtrs[0], startPtrs[1]);
+		printf("Message packet\n");
 		//send message packet
 
 	}
-	else if(!(strcmp(startPtrs[0], "%B")) || !(strcmp(startPtrs[0], "%b"))){
+	else if(!(strcmp(firstWord, "%B")) || !(strcmp(firstWord, "%b"))){
 		//process broadcast packet
+		if(wordCount < 2){
+			printf("Invalid message\n");
+			return;
+		}
+		
 		printf("Broadcast packet\n");
 	}
-	else if(!(strcmp(startPtrs[0], "%L")) || !(strcmp(startPtrs[0], "%l"))){
+	else if(!(strcmp(firstWord, "%L")) || !(strcmp(firstWord, "%l"))){
 		//process list packet
 		printf("List packet\n");
 	}
-	else if(!(strcmp(startPtrs[0], "%E")) || !(strcmp(startPtrs[0], "%e"))){
+	else if(!(strcmp(firstWord, "%E")) || !(strcmp(firstWord, "%e"))){
 		//process exit packet
 		printf("Exit packet\n");
 	}
-	else if(!(strcmp(startPtrs[0], "%C")) || !(strcmp(startPtrs[0], "%c"))){
+	else if(!(strcmp(firstWord, "%C")) || !(strcmp(firstWord, "%c"))){
 		//process multicast packet
 		printf("Multicast packet\n");
 	}
@@ -167,11 +180,10 @@ void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 	// printf("Amount of data sent is: %d\n", sent);
 }
 
-void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len){
+// void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len){
+// 	char sendBuf[MAXBUF];
 
-}
-
-
+// }
 
 int readFromStdin(uint8_t * buffer)
 {

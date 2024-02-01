@@ -46,23 +46,45 @@ int getWordCount(char * string){
     return wordCount;
 }
 
+int getFirst(char * string){
+    int i = 0;
+    while(1){
+        if(string[i] == ' '){
+            string[i] = '\0';
+            return i+1;
+        }
+        if(string[i] == '\0'){
+            return -1;   
+        }
+        i++;
+    }
+}
+
 //function that returns the number of words in a string and sets the pointers to the start of each word
 //adds in null terminators to the string to seperate the words
-int getWords(char * string, char ** startPtrs){
+void getWords(char * string, int numWords, char ** startPtrs){
     int wordCount = 0;
     int i = 0;
     int start = 0;
     while(1){
         if((string[i] == ' ') || (string[i] == '\0')){
-            string[i] = '\0';
             wordCount++;
             startPtrs[wordCount - 1] = string + start;
             start = i + 1;
-            if (string[i] == '\0'){
-                break;
+            if(numWords == wordCount){
+                if(string[i] == '\0'){
+                    startPtrs[wordCount] = NULL;
+                    return;
+                }
+                string[i] = '\0';
+                startPtrs[wordCount] = string + start;
+                return;
             }
+            else if (string[i] == '\0'){
+                return;
+            }
+            string[i] = '\0';
         }
         i++;
     }
-    return wordCount;
 }
