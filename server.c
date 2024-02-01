@@ -40,6 +40,7 @@ void addNewSocket(int mainServerSocket);
 void processClient(int clientSocket);
 void initializeClient(int clientSocket, uint8_t *dataBuffer);
 void processMessage(int clientSocket, uint8_t *dataBuffer, int messageLen);
+void errorPacket(int clientSocket, char *handle, int handle_len);
 
 int main(int argc, char *argv[])
 {
@@ -125,17 +126,26 @@ void processMessage(int clientSocket, uint8_t *dataBuffer, int messageLen){
 	if(numberOfHandles ==1){
 		uint8_t destHandleLen = dataBuffer[bufferOffset];
 		bufferOffset++;
-		char desHandle[destHandleLen];
-		memcpy(desHandle, dataBuffer + bufferOffset, destHandleLen);
-		int destSocket = getSocketNumber(desHandle);
+		char destHandle[destHandleLen+1];
+		printf("destHandleLen: %d\n", destHandleLen);
+		memcpy(destHandle, dataBuffer + bufferOffset, destHandleLen);
+		destHandle[destHandleLen] = '\0';
+		int destSocket = getSocketNumber(destHandle);
 		if(destSocket != -1){
 			sendPDU(destSocket, dataBuffer, messageLen);
 		}
 		else{
-			printf("destination handle %s not found\n", desHandle);
+			errorPacket(clientSocket, destHandle, destHandleLen);
 		}
 	}
 
+}
+
+void errorPacket(int clientSocket, char *handle, int handle_len){
+	uint8_t sendBuf[handle_len + 1];
+	memcpy(sendBuf, &handle_len, 1);
+	memcpy(sendBuf + 1, handle, handle_len);
+	sendPacket(7, sendBuf, handle_len + 1, clientSocket);
 }
 
 void initializeClient(int clientSocket, uint8_t *dataBuffer){

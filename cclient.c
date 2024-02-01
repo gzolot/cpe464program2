@@ -37,6 +37,8 @@ void processMsgFromServer(int socketNum);
 void setupConnection(uint8_t handle_len, char *handle, int socketNum);
 void sendInitialPacket(uint8_t handle_len, char * handle, int socketNum);
 void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len);
+void printMessagePacket(uint8_t * recvBuf);
+void printErrorPacket(uint8_t * recvBuf);
 
 // this function is used to handle a termination signal and set a global variable
 // so that the program will terminate nicely
@@ -106,11 +108,35 @@ void sendInitialPacket(uint8_t handle_len, char * handle, int socketNum){
 void processMsgFromServer(int socketNum){
 	uint8_t recvBuf[MAXBUF];
 	int recvLen = recvPDU(socketNum, recvBuf, MAXBUF);
+	uint8_t flag = recvBuf[0];
 	if(recvLen == 0){
 		printf("Server has terminated\n");
 		exit(-1);
 	}
-	printf("Received: %s\n", recvBuf);
+	if (flag == 5 || 6){
+		printMessagePacket(recvBuf);
+	}
+	if(flag == 7){
+		printErrorPacket(recvBuf);
+	}
+}
+
+void printMessagePacket(uint8_t * recvBuf){
+	uint8_t sendClientHandlelen = recvBuf[1];
+	char sendClientHandle[sendClientHandlelen+1];
+	memcpy(sendClientHandle, recvBuf + 2, sendClientHandlelen);
+	sendClientHandle[sendClientHandlelen] = '\0';
+	uint8_t destHandleLen = recvBuf[3 + sendClientHandlelen];
+	char *message = (char *)recvBuf + 4 + sendClientHandlelen + destHandleLen;
+	printf("\n%s: %s\n", sendClientHandle, message);
+}
+
+void printErrorPacket(uint8_t * recvBuf){
+	uint8_t handleLen = recvBuf[1];
+	char handle[handleLen+1];
+	memcpy(handle, recvBuf + 2, handleLen);
+	handle[handleLen] = '\0';
+	printf("Client with handle %s does not exist.\n", handle);
 }
 
 void sendToServer(int socketNum, char * handle, uint8_t handle_len)
@@ -164,6 +190,21 @@ void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 	else if(!(strcmp(firstWord, "%C")) || !(strcmp(firstWord, "%c"))){
 		//process multicast packet
 		printf("Multicast packet\n");
+		if (wordCount < 3){
+			printf("Invalid message\n");
+			return;
+		}
+		char *numHandles[2];
+		getWords((char *)sendBuf+startIndexSecondWrd, 1, numHandles);
+		int handleCount = atoi(numHandles[0]);
+		char *destHandleNames[handleCount+1];
+		getWords(numHandles[1], handleCount, destHandleNames);
+		//print all the elements in destHandleNames
+		for(int i = 0; i < handleCount; i++){
+			printf("Handle: %s\n", destHandleNames[i]);
+		}
+		printf("Message: %s\n", destHandleNames[handleCount]);
+
 	}
 	else{
 		printf("Invalid command\n");
