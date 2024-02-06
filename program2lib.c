@@ -33,14 +33,16 @@ void sendPacket(uint8_t flag, uint8_t *buffer, int buffer_len, int socketNum){
 int getWordCount(char * string){
     int wordCount = 0;
     int i = 0;
+    char prevChar = ' ';
     while(1){
-        if(string[i] == ' '){
+        if((string[i] == ' ') && (prevChar != ' ')){
             wordCount++;
         }
         if(string[i] == '\0'){
             wordCount++;
             break;
         }
+        prevChar = string[i];
         i++;
     }
     return wordCount;
@@ -66,8 +68,9 @@ void getWords(char * string, int numWords, char ** startPtrs){
     int wordCount = 0;
     int i = 0;
     int start = 0;
+    char lastChar = ' ';
     while(1){
-        if((string[i] == ' ') || (string[i] == '\0')){
+        if(((string[i] == ' ') || (string[i] == '\0')) && (lastChar != ' ')){
             wordCount++;
             startPtrs[wordCount - 1] = string + start;
             start = i + 1;
@@ -85,6 +88,7 @@ void getWords(char * string, int numWords, char ** startPtrs){
             }
             string[i] = '\0';
         }
+        lastChar = string[i];
         i++;
     }
 }

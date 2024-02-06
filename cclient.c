@@ -29,6 +29,7 @@
 
 #define MAXBUF 1024
 #define DEBUG_FLAG 1
+#define MAXMSGSIZE 199
 
 void sendToServer(int socketNum, char * handle, uint8_t handle_len);
 int readFromStdin(uint8_t * buffer);
@@ -39,6 +40,9 @@ void sendInitialPacket(uint8_t handle_len, char * handle, int socketNum);
 void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len, uint8_t recieverCount);
 void printMessagePacket(uint8_t * recvBuf);
 void printErrorPacket(uint8_t * recvBuf);
+void sendBroadcast(int socketNum, char * handle, uint8_t handle_len, char * message);
+void clientControl(int socketNum, uint8_t handle_len, char * handle);
+void sendextraLongMessage(int socketNum, uint8_t *sendBuf, int bufferOffset, char *message, int messagelen, uint8_t flag);
 
 // this function is used to handle a termination signal and set a global variable
 // so that the program will terminate nicely
@@ -52,7 +56,11 @@ int main(int argc, char * argv[])
 	socketNum = tcpClientSetup(argv[2], argv[3], DEBUG_FLAG);
 
 	setupConnection(handle_len, argv[1], socketNum);
+	clientControl(socketNum, handle_len, argv[1]);
+	return 0;
+}
 
+void clientControl(int socketNum, uint8_t handle_len, char * handle){
 	setupPollSet();
 	addToPollSet(socketNum);
 	addToPollSet(STDIN_FILENO);
@@ -61,7 +69,7 @@ int main(int argc, char * argv[])
 		fflush(stdout);
 		int pollReturn = pollCall(-1);
 		if(pollReturn == STDIN_FILENO){
-			sendToServer(socketNum, argv[1], handle_len);
+			sendToServer(socketNum, handle, handle_len);
 		}
 		else if(pollReturn == socketNum){
 			processMsgFromServer(socketNum);
@@ -71,10 +79,7 @@ int main(int argc, char * argv[])
 			exit(-1);
 		}
 	}
-	
 	close(socketNum);
-	
-	return 0;
 }
 
 void setupConnection(uint8_t handle_len, char *handle, int socketNum){
@@ -122,7 +127,7 @@ void processMsgFromServer(int socketNum){
 	else if(flag == 11){
 		uint32_t *elements = (uint32_t *) &recvBuf[1];
 		uint32_t clients = ntohl(*elements);
-		printf("Number of clients: %d\n", clients);
+		printf("\nNumber of clients: %d\n", clients);
 	}
 	else if(flag == 12){
 		uint8_t handleLen = recvBuf[1];
@@ -132,7 +137,14 @@ void processMsgFromServer(int socketNum){
 		printf("\t%s\n", handle);
 	}
 	else if(flag == 9){
-		exit(1);
+		exit(0);
+	}
+	else if(flag == 4){
+		uint8_t handleLen = recvBuf[1];
+		char handle[handleLen+1];
+		memcpy(handle, recvBuf + 2, handleLen);
+		handle[handleLen] = '\0';
+		printf("\n%s: %s\n", handle, recvBuf + 2 + handleLen);
 	}
 	else{
 		printf("Error in packet\n");
@@ -204,8 +216,10 @@ void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 			printf("Invalid message\n");
 			return;
 		}
-		
-		printf("Broadcast packet\n");
+		char *message = (char *)sendBuf+startIndexSecondWrd;
+		sendBroadcast(socketNum, handle, handle_len, message);
+		//printf("Broadcast packet\n");
+
 	}
 	else if(!(strcmp(firstWord, "%L")) || !(strcmp(firstWord, "%l"))){
 		//process list packet
@@ -259,8 +273,30 @@ void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 	// printf("Amount of data sent is: %d\n", sent);
 }
 
+void sendBroadcast(int socketNum, char * handle, uint8_t handle_len, char * message){
+	uint8_t sendBuf[MAXBUF];
+	memcpy(sendBuf, &handle_len, 1);
+	memcpy(sendBuf + 1, handle, handle_len);
+	//int bufferOffset = 2 + handle_len + strlen(message);
+	int messageLen = strlen(message);
+	if (messageLen > MAXMSGSIZE){
+		sendextraLongMessage(socketNum, sendBuf, 1 + handle_len, message, messageLen, 4);
+	}
+	else{
+		memcpy(sendBuf + 1 + handle_len, message, strlen(message)+1);
+		sendPacket(4, sendBuf, handle_len + strlen(message) + 2, socketNum);
+	}
+}
+
 void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len, uint8_t recieverCount){
 	uint8_t sendBuf[MAXBUF];
+	uint8_t flag;
+	if (recieverCount > 1){
+		flag = 6;
+	}
+	else{
+		flag = 5;
+	}
 	memcpy(sendBuf, &handle_len, 1);
 	memcpy(sendBuf + 1, handle, handle_len);
 	memcpy(sendBuf + 1 + handle_len, &recieverCount, 1);
@@ -275,13 +311,23 @@ void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle
 		handleCount++;
 	}
 	if (startPtrs[handleCount] != NULL){
-		memcpy(sendBuf + bufferOffset, startPtrs[handleCount], strlen(startPtrs[handleCount])+1);
-		bufferOffset += strlen(startPtrs[handleCount])+1;
+		int messagelen = strlen(startPtrs[handleCount]);
+		//printf("Message length: %d\n", messagelen);
+		if (messagelen > MAXMSGSIZE){
+			//printf("Message is too long\n");
+			sendextraLongMessage(socketNum, sendBuf, bufferOffset, startPtrs[handleCount], messagelen, flag);
+		}
+		else{
+			memcpy(sendBuf + bufferOffset, startPtrs[handleCount], strlen(startPtrs[handleCount])+1);
+			bufferOffset += strlen(startPtrs[handleCount])+1;
+			sendPacket(flag, sendBuf, bufferOffset, socketNum);
+		}
 	}
 	else{
 		char *nullstring = "\n\0";
 		memcpy(sendBuf + bufferOffset, nullstring, 2);
 		bufferOffset += 2;
+		sendPacket(flag, sendBuf, bufferOffset, socketNum);
 	}
 	// uint8_t destHandleLen = strlen(startPtrs[0]);
 	// memcpy(sendBuf + 2 + handle_len, &destHandleLen, 1);
@@ -293,15 +339,22 @@ void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle
 	// 	char *nullstring = "\n\0";
 	// 	memcpy(sendBuf + 3 + handle_len + strlen(startPtrs[0]), nullstring, 2);
 	// }
-	uint8_t flag;
-	if (recieverCount > 1){
-		flag = 6;
-	}
-	else{
-		flag = 5;
-	}
-	sendPacket(flag, sendBuf, bufferOffset, socketNum);
 	//printf("The following message was sent to the server: %s\n", startPtrs[1]);
+}
+
+void sendextraLongMessage(int socketNum, uint8_t *sendBuf, int bufferOffset, char *message, int messagelen, uint8_t flag){
+	int messageOffset = 0;
+	while(messagelen > MAXMSGSIZE){
+		memcpy(sendBuf + bufferOffset, message + messageOffset, MAXMSGSIZE);
+		memcpy(sendBuf + bufferOffset + MAXMSGSIZE, "\0", 1);
+		messagelen -= MAXMSGSIZE;
+		messageOffset += MAXMSGSIZE;
+		sendPacket(flag, sendBuf, MAXMSGSIZE + bufferOffset + 1, socketNum);
+		//printf("message sent is %s\n", sendBuf + bufferOffset);
+	}
+	memcpy(sendBuf + bufferOffset, message + messageOffset, messagelen);
+	memcpy(sendBuf + bufferOffset + messagelen, "\0", 1);
+	sendPacket(flag, sendBuf, messagelen + bufferOffset + 1, socketNum);
 }
 
 int readFromStdin(uint8_t * buffer)

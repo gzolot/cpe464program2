@@ -42,6 +42,7 @@ void initializeClient(int clientSocket, uint8_t *dataBuffer);
 void processMessage(int clientSocket, uint8_t *dataBuffer, int messageLen);
 void errorPacket(int clientSocket, char *handle, int handle_len);
 void sendFlag11(int clientSocket);
+void processBroadcast(int clientSocket, uint8_t *dataBuffer, int messageLen);
 
 int main(int argc, char *argv[])
 {
@@ -59,8 +60,6 @@ int main(int argc, char *argv[])
 	/* close the sockets */
 	close(clientSocket);
 	close(mainServerSocket);
-
-	
 	return 0;
 }
 
@@ -119,6 +118,9 @@ void processClient(int clientSocket){
 			close(clientSocket);
 			removeFromPollSet(clientSocket);
 		}
+		else if(dataBuffer[0] == 4){
+			processBroadcast(clientSocket, dataBuffer, messageLen);
+		}
 		else{
 			printf("Error in packet\n");
 		}
@@ -151,6 +153,24 @@ void sendFlag11(int clientSocket){
 	}
 }
 
+void processBroadcast(int clientSocket, uint8_t *dataBuffer, int messageLen){
+	uint8_t sendingHandleLen = dataBuffer[1];
+	char sendingHandle[sendingHandleLen+1];
+	memcpy(sendingHandle, dataBuffer + 2, sendingHandleLen);
+	sendingHandle[sendingHandleLen] = '\0';
+	uint32_t numOfClients = getLength();
+	char *listOfHandles[numOfClients];
+	getAllHandles(listOfHandles);
+	int sendingSocket = getSocketNumber(sendingHandle);
+	while(numOfClients > 0){
+		int socket = getSocketNumber(listOfHandles[numOfClients-1]);
+		if(socket != sendingSocket){
+			sendPDU(socket, dataBuffer, messageLen);
+		}
+		numOfClients--;
+	}
+}
+
 void processMessage(int clientSocket, uint8_t *dataBuffer, int messageLen){
 	uint8_t sendingHandleLen = dataBuffer[1];
 	int bufferOffset = 1+1+sendingHandleLen;
@@ -172,7 +192,7 @@ void processMessage(int clientSocket, uint8_t *dataBuffer, int messageLen){
 			sendPDU(destSocket, dataBuffer, messageLen);
 		}
 		else{
-			printf("sending error packet with handle name %s and length%d\n", destHandle, destHandleLen);
+			//printf("sending error packet with handle name %s and length%d\n", destHandle, destHandleLen);
 			errorPacket(clientSocket, destHandle, destHandleLen);
 		}
 		handleCounter++;
