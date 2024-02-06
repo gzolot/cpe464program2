@@ -26,7 +26,7 @@ void sendPacket(uint8_t flag, uint8_t *buffer, int buffer_len, int socketNum){
 		perror("send call");
 		exit(-1);
 	}
-	printf("Amount of data sent is: %d\n", sent);
+	//printf("Amount of data sent is: %d\n", sent);
 }
 
 //function that counts number of words seperated by spaces in a string

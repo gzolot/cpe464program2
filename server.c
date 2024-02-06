@@ -41,6 +41,7 @@ void processClient(int clientSocket);
 void initializeClient(int clientSocket, uint8_t *dataBuffer);
 void processMessage(int clientSocket, uint8_t *dataBuffer, int messageLen);
 void errorPacket(int clientSocket, char *handle, int handle_len);
+void sendFlag11(int clientSocket);
 
 int main(int argc, char *argv[])
 {
@@ -95,9 +96,9 @@ void processClient(int clientSocket){
 	if ((messageLen = recvPDU(clientSocket, dataBuffer, MAXBUF)) < 0)
 	{
 		perror("recv call");
-		exit(-1);
 		close(clientSocket);
 		removeFromPollSet(clientSocket);
+		removeNode(clientSocket);
 	}
 
 	if (messageLen > 0)
@@ -105,16 +106,48 @@ void processClient(int clientSocket){
 		if(dataBuffer[0] == 1){
 			initializeClient(clientSocket, dataBuffer);
 		}
-		if(dataBuffer[0] == 5){
+		else if(dataBuffer[0] == 5 || dataBuffer[0] == 6){
 			processMessage(clientSocket, dataBuffer, messageLen);
 		}
-		printf("Message received, Socket: %d length: %d Data: %s\n",clientSocket, messageLen, dataBuffer);
+		else if(dataBuffer[0] == 10){
+			sendFlag11(clientSocket);
+		}
+		else if(dataBuffer[0] == 8){
+			sendPacket(9, NULL, 0, clientSocket);
+			removeNode(clientSocket);
+			//printList();
+			close(clientSocket);
+			removeFromPollSet(clientSocket);
+		}
+		else{
+			printf("Error in packet\n");
+		}
+		//printf("Message received, Socket: %d length: %d Data: %s\n",clientSocket, messageLen, dataBuffer);
 	}
 	else
 	{
 		printf("Connection closed by other side\n");
 		close(clientSocket);
 		removeFromPollSet(clientSocket);
+		removeNode(clientSocket);
+	}
+}
+
+void sendFlag11(int clientSocket){
+	uint32_t lengthHost = getLength();
+	char *listOfHandles[lengthHost];
+	uint32_t lengthNetwork = htonl(lengthHost);
+	uint8_t sendBuf[4];
+	memcpy(sendBuf, &lengthNetwork, 4);
+	sendPacket(11, sendBuf, 4, clientSocket);
+	getAllHandles(listOfHandles);
+	while(lengthHost > 0){
+		uint8_t handle_len = strlen(listOfHandles[lengthHost-1]);
+		uint8_t sendBuf[handle_len + 1];
+		memcpy(sendBuf, &handle_len, 1);
+		memcpy(sendBuf + 1, listOfHandles[lengthHost-1], handle_len);
+		sendPacket(12, sendBuf, handle_len + 1, clientSocket);
+		lengthHost--;
 	}
 }
 
@@ -122,21 +155,27 @@ void processMessage(int clientSocket, uint8_t *dataBuffer, int messageLen){
 	uint8_t sendingHandleLen = dataBuffer[1];
 	int bufferOffset = 1+1+sendingHandleLen;
 	uint8_t numberOfHandles = dataBuffer[bufferOffset];
+	//printf("numberOfHandles: %d\n", numberOfHandles);
 	bufferOffset++;
-	if(numberOfHandles ==1){
+	int handleCounter = 0;
+	while(handleCounter < numberOfHandles){
 		uint8_t destHandleLen = dataBuffer[bufferOffset];
 		bufferOffset++;
 		char destHandle[destHandleLen+1];
-		printf("destHandleLen: %d\n", destHandleLen);
+		//printf("destHandleLen: %d\n", destHandleLen);
 		memcpy(destHandle, dataBuffer + bufferOffset, destHandleLen);
+		bufferOffset += destHandleLen;
 		destHandle[destHandleLen] = '\0';
 		int destSocket = getSocketNumber(destHandle);
+		//printf("desthandle: %s\n", destHandle);
 		if(destSocket != -1){
 			sendPDU(destSocket, dataBuffer, messageLen);
 		}
 		else{
+			printf("sending error packet with handle name %s and length%d\n", destHandle, destHandleLen);
 			errorPacket(clientSocket, destHandle, destHandleLen);
 		}
+		handleCounter++;
 	}
 
 }
@@ -155,7 +194,7 @@ void initializeClient(int clientSocket, uint8_t *dataBuffer){
 	handle[handle_len] = '\0';
 	if(getSocketNumber(handle) == -1){
 		addNode(clientSocket, handle, handle_len+1);
-		printList();
+		//printList();
 		sendPacket(2, NULL, 0, clientSocket);
 	}
 	else{

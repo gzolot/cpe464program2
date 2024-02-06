@@ -36,7 +36,7 @@ uint8_t checkArgs(int argc, char * argv[]);
 void processMsgFromServer(int socketNum);
 void setupConnection(uint8_t handle_len, char *handle, int socketNum);
 void sendInitialPacket(uint8_t handle_len, char * handle, int socketNum);
-void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len);
+void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len, uint8_t recieverCount);
 void printMessagePacket(uint8_t * recvBuf);
 void printErrorPacket(uint8_t * recvBuf);
 
@@ -113,21 +113,49 @@ void processMsgFromServer(int socketNum){
 		printf("Server has terminated\n");
 		exit(-1);
 	}
-	if (flag == 5 || 6){
+	if (flag == 5 || flag == 6){
 		printMessagePacket(recvBuf);
 	}
-	if(flag == 7){
+	else if(flag == 7){
 		printErrorPacket(recvBuf);
 	}
+	else if(flag == 11){
+		uint32_t *elements = (uint32_t *) &recvBuf[1];
+		uint32_t clients = ntohl(*elements);
+		printf("Number of clients: %d\n", clients);
+	}
+	else if(flag == 12){
+		uint8_t handleLen = recvBuf[1];
+		char handle[handleLen+1];
+		memcpy(handle, recvBuf + 2, handleLen);
+		handle[handleLen] = '\0';
+		printf("\t%s\n", handle);
+	}
+	else if(flag == 9){
+		exit(1);
+	}
+	else{
+		printf("Error in packet\n");
+		exit(-1);
+	}
 }
+
 
 void printMessagePacket(uint8_t * recvBuf){
 	uint8_t sendClientHandlelen = recvBuf[1];
 	char sendClientHandle[sendClientHandlelen+1];
 	memcpy(sendClientHandle, recvBuf + 2, sendClientHandlelen);
 	sendClientHandle[sendClientHandlelen] = '\0';
-	uint8_t destHandleLen = recvBuf[3 + sendClientHandlelen];
-	char *message = (char *)recvBuf + 4 + sendClientHandlelen + destHandleLen;
+	uint8_t numofRecervers = recvBuf[2 + sendClientHandlelen];
+	uint8_t counter = 0;
+	int bufferOffset = 3 + sendClientHandlelen;
+	while(counter < numofRecervers){
+		uint8_t destHandleLen = recvBuf[bufferOffset];
+		bufferOffset += 1+destHandleLen;
+		counter++;
+	}
+	char *message = (char *)recvBuf + bufferOffset;
+	//printf("in print message packet\n");
 	printf("\n%s: %s\n", sendClientHandle, message);
 }
 
@@ -166,8 +194,8 @@ void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 		char *startPtrs[2];
 		getWords((char *)sendBuf+startIndexSecondWrd, 1, startPtrs);
 		//printf("first word: %s\nsecond word: %s\n", startPtrs[0], startPtrs[1]);
-		printf("Message packet\n");
-		sendMessage(socketNum, startPtrs, handle, handle_len);
+		//printf("Message packet\n");
+		sendMessage(socketNum, startPtrs, handle, handle_len, 1);
 
 	}
 	else if(!(strcmp(firstWord, "%B")) || !(strcmp(firstWord, "%b"))){
@@ -181,15 +209,17 @@ void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 	}
 	else if(!(strcmp(firstWord, "%L")) || !(strcmp(firstWord, "%l"))){
 		//process list packet
-		printf("List packet\n");
+		//printf("List packet\n");
+		sendPacket(10, NULL, 0, socketNum);
 	}
 	else if(!(strcmp(firstWord, "%E")) || !(strcmp(firstWord, "%e"))){
 		//process exit packet
-		printf("Exit packet\n");
+		//printf("Exit packet\n");
+		sendPacket(8, NULL, 0, socketNum);
 	}
 	else if(!(strcmp(firstWord, "%C")) || !(strcmp(firstWord, "%c"))){
 		//process multicast packet
-		printf("Multicast packet\n");
+		//printf("Multicast packet\n");
 		if (wordCount < 3){
 			printf("Invalid message\n");
 			return;
@@ -197,13 +227,20 @@ void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 		char *numHandles[2];
 		getWords((char *)sendBuf+startIndexSecondWrd, 1, numHandles);
 		int handleCount = atoi(numHandles[0]);
+		if(handleCount < 2 || handleCount > 9){
+			printf("There should be 2 to 9 recieving handles with a multicast\n");
+			return;
+		}
 		char *destHandleNames[handleCount+1];
 		getWords(numHandles[1], handleCount, destHandleNames);
+		sendMessage(socketNum, destHandleNames, handle, handle_len, handleCount);
+	// if (handleCount)
 		//print all the elements in destHandleNames
-		for(int i = 0; i < handleCount; i++){
-			printf("Handle: %s\n", destHandleNames[i]);
-		}
-		printf("Message: %s\n", destHandleNames[handleCount]);
+		// for(int i = 0; i < handleCount; i++){
+		// 	printf("Handle: %s\n", destHandleNames[i]);
+		// }
+		// printf("Message: %s\n", destHandleNames[handleCount]);
+
 
 	}
 	else{
@@ -222,24 +259,49 @@ void sendToServer(int socketNum, char * handle, uint8_t handle_len)
 	// printf("Amount of data sent is: %d\n", sent);
 }
 
-void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len){
+void sendMessage(int socketNum, char ** startPtrs, char * handle, uint8_t handle_len, uint8_t recieverCount){
 	uint8_t sendBuf[MAXBUF];
 	memcpy(sendBuf, &handle_len, 1);
 	memcpy(sendBuf + 1, handle, handle_len);
-	uint8_t one = 1;
-	memcpy(sendBuf + 1 + handle_len, &one, 1);
-	uint8_t destHandleLen = strlen(startPtrs[0]);
-	memcpy(sendBuf + 2 + handle_len, &destHandleLen, 1);
-	memcpy(sendBuf + 3 + handle_len, startPtrs[0], strlen(startPtrs[0]));
-	if (startPtrs[1] != NULL){
-		memcpy(sendBuf + 3 + handle_len + strlen(startPtrs[0]), startPtrs[1], strlen(startPtrs[1])+1);
+	memcpy(sendBuf + 1 + handle_len, &recieverCount, 1);
+	int handleCount = 0;
+	int bufferOffset = 2 + handle_len;
+	while(handleCount < recieverCount){
+		uint8_t destHandleLen = strlen(startPtrs[handleCount]);
+		memcpy(sendBuf + bufferOffset, &destHandleLen, 1);
+		bufferOffset++;
+		memcpy(sendBuf + bufferOffset, startPtrs[handleCount], destHandleLen);
+		bufferOffset += destHandleLen;
+		handleCount++;
+	}
+	if (startPtrs[handleCount] != NULL){
+		memcpy(sendBuf + bufferOffset, startPtrs[handleCount], strlen(startPtrs[handleCount])+1);
+		bufferOffset += strlen(startPtrs[handleCount])+1;
 	}
 	else{
 		char *nullstring = "\n\0";
-		memcpy(sendBuf + 3 + handle_len + strlen(startPtrs[0]), nullstring, 2);
+		memcpy(sendBuf + bufferOffset, nullstring, 2);
+		bufferOffset += 2;
 	}
-	sendPacket(5, sendBuf, 4 + handle_len + strlen(startPtrs[0]) + strlen(startPtrs[1]), socketNum);
-	printf("The following message was sent to the server: %s\n", startPtrs[1]);
+	// uint8_t destHandleLen = strlen(startPtrs[0]);
+	// memcpy(sendBuf + 2 + handle_len, &destHandleLen, 1);
+	// memcpy(sendBuf + 3 + handle_len, startPtrs[0], strlen(startPtrs[0]));
+	// if (startPtrs[1] != NULL){
+	// 	memcpy(sendBuf + 3 + handle_len + strlen(startPtrs[0]), startPtrs[1], strlen(startPtrs[1])+1);
+	// }
+	// else{
+	// 	char *nullstring = "\n\0";
+	// 	memcpy(sendBuf + 3 + handle_len + strlen(startPtrs[0]), nullstring, 2);
+	// }
+	uint8_t flag;
+	if (recieverCount > 1){
+		flag = 6;
+	}
+	else{
+		flag = 5;
+	}
+	sendPacket(flag, sendBuf, bufferOffset, socketNum);
+	//printf("The following message was sent to the server: %s\n", startPtrs[1]);
 }
 
 int readFromStdin(uint8_t * buffer)

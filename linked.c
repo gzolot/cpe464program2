@@ -39,11 +39,11 @@ int getSocketNumber(char *name){
     return -1;
 }
 
-void removeNode(char *name){
+void removeNode(int socketNumber){
     struct handle *current = head;
     struct handle *prev = NULL;
     while (current != NULL){
-        if (strcmp(current->next->name, name) == 0){
+        if (current->socketNumber == socketNumber){
             if (prev == NULL){
                 head = current->next;
             }
@@ -67,8 +67,18 @@ void printList(){
     }
 }
 
-int getLength(){
-    int length = 0;
+void getAllHandles(char **listOfHandles){
+    struct handle *current = head;
+    int i = 0;
+    while (current != NULL){
+        listOfHandles[i] = current->name;
+        current = current->next;
+        i++;
+    }
+}
+
+uint32_t getLength(){
+    uint32_t length = 0;
     struct handle *current = head;
     while (current != NULL){
         length++;

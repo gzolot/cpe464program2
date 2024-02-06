@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 struct handle
 {
@@ -12,9 +13,10 @@ struct handle
 
 void addNode(int socketNumber, char *name, int nameLength);
 int getSocketNumber(char *name);
-void removeNode(char *name);
+void removeNode(int socketNumber);
 void printList(void);
-int getLength(void);
+uint32_t getLength(void);
+void getAllHandles(char **listOfHandles);
 
 
 
